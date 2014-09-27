@@ -39,8 +39,8 @@ this.init = function () {
         blink: this.blinkState
     };
 
-    this.setMidiFunction('toggle');
     this.midiInterface = this.patcher.getnamed('toOhm64');
+    this.setMidiFunction('toggle');
     this.clear();
 };
 
@@ -103,8 +103,21 @@ this.blinkState = function (buttonId, isKeyDown) {
         button.blinkTask.repeat();
         button.isBlinking = true;
     } else {
-        button.blinkTask.cancel(); 
+        this.cancelBlink(buttonId);
         this.triggerState(buttonId, 0);
+    }
+};
+
+/**
+ * Cancel the blinking of a button. The state of the button will not be affected
+ *
+ * @param integer buttonId The id of the button to stop blinking
+ */
+this.cancelBlink = function (buttonId) {
+    var button = this.getButton(buttonId);
+
+    if (button.isBlinking) {
+        button.blinkTask.cancel();
     }
 };
 
@@ -128,22 +141,40 @@ this.setButtonState = function (buttonId, state) {
  */
 this.getButton = function (buttonId) {
     if (this.buttonStates[buttonId] === undefined) {
-        this.buttonStates[buttonId] = {};
+        this.buttonStates[buttonId] = {
+            midiFunction: this.midiFunction
+        };
     };
     
     return this.buttonStates[buttonId];
 };
 
 /**
- * Set the MIDI function
+ * Set the MIDI function. If a buttonId is specified it will update the MIDI function for that key. If
+ * not, it will update ALL buttons
  * 
  * @param string functionName The name of the function to use (must be one of this.MIDI_FUNCTION_MAP)
+ * @param integer buttonId The id of the button to set the MIDI function on (optional)
  */
-this.setMidiFunction = function (functionName) {
-    if (this.MIDI_FUNCTION_MAP[functionName]) {
-        this.midiFunction = this.MIDI_FUNCTION_MAP[functionName];
-    }else {
-        post(functionName + ' is not a valid midi function');
+this.setMidiFunction = function (functionName, buttonId) {
+    if (!this.MIDI_FUNCTION_MAP[functionName]) {
+        error(functionName + ' is not a valid midi function');
+        return;
+    }
+
+    var midiFunction = this.MIDI_FUNCTION_MAP[functionName];
+
+    if (buttonId !== undefined) {
+        if (!parseInt(buttonId)) {
+            error("setMidiFunction: buttonId must be an integer");
+            return;
+        }
+
+        this.clear(buttonId);
+        this.getButton(buttonId).midiFunction = midiFunction;
+    } else {
+        this.clear();
+        this.midiFunction = midiFunction;
     }
 };
 
@@ -221,10 +252,27 @@ this.factoryReset = function () {
 };
 
 /**
- *  Cleart all the buttons 
+ *  Clear a button. If no button is specified, clear them all
+ *
+ * @param integer buttonId The Id of the button to clear (optional)
  */
-this.clear = function () {
-    this.buttonStates = [];
+this.clear = function (buttonId) {
+    if (buttonId !== undefined) {
+        if (!parseInt(buttonId)) {
+            error("clear: buttonId must be an integer");
+            return;
+        }
+
+        this.cancelBlink(this.getButton(buttonId));
+        this.buttonStates.splice(buttonId, 1);
+    } else {
+        for (index in this.buttonStates) {
+            this.cancelBlink(index);
+        }
+
+        this.buttonStates = [];
+    }
+
     this.sync();
 };
 
