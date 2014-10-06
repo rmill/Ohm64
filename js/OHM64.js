@@ -48,12 +48,43 @@ var Ohm64 = function (patcher) {
     this.midiButtonMap;
 
     /**
+     * This task constantly re-renders the display
+     *
+     * @var Task
+     */
+    this.renderTask;
+
+    /**
      * Initialize the object
      */
     this.init = function () {
         this.setMidiInterface(this.patcher.getnamed('toOhm64'));
         this.setViewFunction(Ohm64_Button.VIEW_TRIGGER);
         this.requestMidiButtonMap();
+
+        this.sync();
+    };
+
+    this.renderStart = function () {
+        if (this.renderTask) {
+            return;
+        } 
+
+        this.renderTask = new Task(
+            function () {
+                this.sync();
+            },
+            this
+        );
+        this.renderTask.interval = 10;
+        this.renderTask.repeat();
+    };
+
+    this.renderStop = function ()  {
+        if (this.renderTask) {
+            this.renderTask.cancel();
+            delete this.renderTask;
+        }
     };
 
     /**
@@ -65,7 +96,6 @@ var Ohm64 = function (patcher) {
      */
     this.buttonPress = function (buttonId, state) {
         this.getButton(buttonId).press(state);
-        this.sync();
     };
 
     /**
@@ -131,7 +161,7 @@ var Ohm64 = function (patcher) {
         var buttonId = this.midiButtonMap[midiNote];
 
         if (this.buttonStates[buttonId] === undefined) {
-            this.buttonStates[buttonId] = new Ohm64_Button(this, buttonId, this.viewFunction);
+            this.buttonStates[buttonId] = new Ohm64_Button(buttonId, this.viewFunction);
         };
         
         return this.buttonStates[buttonId];
@@ -178,8 +208,6 @@ var Ohm64 = function (patcher) {
         for(var i = 0; i < states.length; i++) {
             this.getButton(i).state = Boolean(states[i]);
         }
-        
-        this.sync();
     };
 
     /**
@@ -189,15 +217,15 @@ var Ohm64 = function (patcher) {
      * http://wiki.lividinstruments.com/wiki/Ohm64
      */
     this.sync = function () {
-        var sysexCommand = [240, 0, 1, 97, 2, 4]; 
-        for (var i=0; i < this.OHM64_INDEX_MASK.length; i++) {
-            var checksum = this.getColumnChecksum(i);
-            sysexCommand.push(checksum.LL, checksum.HH);
-        }
+        // var sysexCommand = [240, 0, 1, 97, 2, 4]; 
+        // for (var i=0; i < this.OHM64_INDEX_MASK.length; i++) {
+        //     var checksum = this.getColumnChecksum(i);
+        //     sysexCommand.push(checksum.LL, checksum.HH);
+        // }
         
-        sysexCommand.push(247);
+        // sysexCommand.push(247);
         
-        this.midiInterface.message(sysexCommand);
+        // this.midiInterface.message(sysexCommand);
     };
 
     this.getColumnChecksum = function (column) {
@@ -267,8 +295,6 @@ var Ohm64 = function (patcher) {
 
             this.buttonStates = [];
         }
-
-        this.sync();
     };
 
     /**
@@ -277,26 +303,6 @@ var Ohm64 = function (patcher) {
      * 
      * @var array
      */
-    // this.OHM64_INDEX_MASK = [
-    //     [0, 6, 12, 18, 24, 30, 36, 42, 48, 54, null, 60, null, null],
-    //     [1, 7, 13, 19, 25, 31, 37, 43, 49, 55, null, 61, null, null],
-    //     [2, 8, 14, 20, 26, 32, 38, 44, 50, 56, null, 62, null, null],
-    //     [3, 9, 15, 21, 27, 33, 39, 45, 51, 57, null, 63, null, null],
-    //     [4, 10, 16, 22, 28, 34, 40, 46, 52, 58, null, null, null, null],
-    //     [5, 11, 17, 23, 29, 35, 41, 47, 53, 59, null, null, null, null]
-    // ];
-
-/*
-0 8  16 24 32 40 48 56
-1 9  17 25 33 41 49 57
-2 10 18 26 34 42 50 58
-3 11 19 27 35 43 51 59
-4 12 20 28 36 44 52 60
-5 13 21 29 37 45 53 61
-6 14 22 30 38 46 54 62
-7 15 23 31 39 47 55 63
-*/
-
     this.OHM64_INDEX_MASK = [
         [0, 48, 33, 18, 3, 51, 36, 21, 6, 54, null, 39, null, null],
         [8, 56, 41, 26, 11, 59, 44, 29, 14, 62, null, 47, null, null],
@@ -306,27 +312,16 @@ var Ohm64 = function (patcher) {
         [40, 25, 10, 58, 43, 28, 13, 61, 46, 31, null, null, null, null]
     ];
 
-/*
-0  1  2  3  4  5  6  7 
-8  9  10 11 12 13 14 15 
-16 17 18 19 20 21 22 23 
-24 25 26 27 28 29 30 31 
-32 33 34 35 36 37 38 39 
-40 41 42 43 44 45 46 47 
-48 49 50 51 52 53 54 55 
-56 57 58 59 60 61 62 63  
-*/
     // Initialize the Ohm64
     this.init();
 };
 
-var Ohm64_Button = function (Ohm64, buttonId, viewFunctionName) {
+var Ohm64_Button = function (buttonId, viewFunctionName) {
 
     /**
      * Initialize the object
      */
     this.init = function () {    
-        this.Ohm64 = Ohm64;
         this.buttonId = buttonId;
         this.state = BUTTON_OFF;
         this.setViewFunction(viewFunctionName);
@@ -378,7 +373,7 @@ var Ohm64_Button = function (Ohm64, buttonId, viewFunctionName) {
         }
 
         // Toggle the state
-        this.state = (this.state > 0) ? 0 : 1;
+        this.state = (this.state == BUTTON_OFF) ? BUTTON_ON : BUTTON_OFF;
     };
 
     /**
@@ -406,7 +401,6 @@ var Ohm64_Button = function (Ohm64, buttonId, viewFunctionName) {
             this.blinkTask = new Task(
                 function () {
                     this.viewToggle(true);
-                    this.Ohm64.sync(); 
                 },
                 this
             );
@@ -415,7 +409,7 @@ var Ohm64_Button = function (Ohm64, buttonId, viewFunctionName) {
             this.isBlinking = true;
         } else {
             this.cancelBlink();
-            this.state = 0;
+            this.state = BUTTON_OFF;
         }
     };
 
@@ -507,3 +501,5 @@ function factoryReset() {Ohm64_Controller.factoryReset();}
 function list() {Ohm64_Controller.setStatesFromArray(arguements);}
 function button(buttonId, state) {Ohm64_Controller.buttonPress(buttonId, state);}
 function sysex(code) {Ohm64_Controller.parseSysexCode(code);}
+function renderStart() {Ohm64_Controller.renderStart();}
+function renderStop() {Ohm64_Controller.renderStop();}
