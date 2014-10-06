@@ -55,12 +55,21 @@ var Ohm64 = function (patcher) {
     this.renderTask;
 
     /**
+     * The global blink speed in miliseconds. This will be used as the default when a 
+     * button is pressed
+     *
+     * @var integer
+     */
+     this.blinkSpeed;
+
+    /**
      * Initialize the object
      */
     this.init = function () {
         this.setMidiInterface(this.patcher.getnamed('toOhm64'));
         this.setViewFunction(Ohm64_Button.VIEW_TRIGGER);
         this.requestMidiButtonMap();
+        this.blinkSpeed = 100;
 
         this.sync();
     };
@@ -161,7 +170,7 @@ var Ohm64 = function (patcher) {
         var buttonId = this.midiButtonMap[midiNote];
 
         if (this.buttonStates[buttonId] === undefined) {
-            this.buttonStates[buttonId] = new Ohm64_Button(buttonId, this.viewFunction);
+            this.buttonStates[buttonId] = new Ohm64_Button(buttonId, this.viewFunction, this.blinkSpeed);
         };
         
         return this.buttonStates[buttonId];
@@ -193,6 +202,28 @@ var Ohm64 = function (patcher) {
     };
 
     /**
+     * Set the blink speed. If a button Id is specified only that button will be
+     * updated. Else every button will be updated.
+     *
+     * @var intger blinkSpeed The blink speed in miliseconds
+     * @var integer buttonId The button to update (optional)
+     */
+     this.setBlinkSpeed = function (blinkSpeed, buttonId) {
+        var buttons;
+
+        if (buttonId !== undefined) {
+            buttons = [this.getButton(buttonId)];
+        } else {
+            this.blinkSpeed = blinkSpeed;
+            buttons = this.buttonStates;
+        }
+
+        for (index in buttons) {
+            buttons[index].setBlinkSpeed(blinkSpeed);
+        }
+     }
+
+    /**
      * Set the state of all the buttons
      *
      * @param array states a list of the states (ON or OFF)
@@ -217,15 +248,15 @@ var Ohm64 = function (patcher) {
      * http://wiki.lividinstruments.com/wiki/Ohm64
      */
     this.sync = function () {
-        // var sysexCommand = [240, 0, 1, 97, 2, 4]; 
-        // for (var i=0; i < this.OHM64_INDEX_MASK.length; i++) {
-        //     var checksum = this.getColumnChecksum(i);
-        //     sysexCommand.push(checksum.LL, checksum.HH);
-        // }
+        var sysexCommand = [240, 0, 1, 97, 2, 4]; 
+        for (var i=0; i < this.OHM64_INDEX_MASK.length; i++) {
+            var checksum = this.getColumnChecksum(i);
+            sysexCommand.push(checksum.LL, checksum.HH);
+        }
         
-        // sysexCommand.push(247);
+        sysexCommand.push(247);
         
-        // this.midiInterface.message(sysexCommand);
+        this.midiInterface.message(sysexCommand);
     };
 
     this.getColumnChecksum = function (column) {
@@ -316,7 +347,7 @@ var Ohm64 = function (patcher) {
     this.init();
 };
 
-var Ohm64_Button = function (buttonId, viewFunctionName) {
+var Ohm64_Button = function (buttonId, viewFunctionName, blinkSpeed) {
 
     /**
      * Initialize the object
@@ -326,7 +357,7 @@ var Ohm64_Button = function (buttonId, viewFunctionName) {
         this.state = BUTTON_OFF;
         this.setViewFunction(viewFunctionName);
         this.isBlinking = false;
-        this.setBlinkSpeed(100);
+        this.setBlinkSpeed(blinkSpeed);
         this.blinkTask = null;
     }
 
@@ -496,7 +527,7 @@ var Ohm64_Controller = new Ohm64(this.patcher);
 function init() {Ohm64_Controller.init();}
 function clear() {Ohm64_Controller.clear();}
 function setViewFunction(viewFunction) {Ohm64_Controller.setViewFunction(viewFunction); }
-function setBlinkSpeed(blinkSpeed) {Ohm64_Controller.setBlinkSpeed(blinkSpeed);}
+function setBlinkSpeed(blinkSpeed, buttonId) {Ohm64_Controller.setBlinkSpeed(blinkSpeed, buttonId);}
 function factoryReset() {Ohm64_Controller.factoryReset();}
 function list() {Ohm64_Controller.setStatesFromArray(arguements);}
 function button(buttonId, state) {Ohm64_Controller.buttonPress(buttonId, state);}
