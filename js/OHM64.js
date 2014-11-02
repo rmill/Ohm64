@@ -231,7 +231,7 @@ var Ohm64 = function (patcher) {
     this.setStatesFromArray = function (states) {
         // Validate the input
         if (states.length !== 64) {
-            error('Invalid list. See help for the list reference');
+            error('Invalid list. Must be 8x8 list');
             return;
         }
             
@@ -529,7 +529,7 @@ function clear() {Ohm64_Controller.clear();}
 function setViewFunction(viewFunction) {Ohm64_Controller.setViewFunction(viewFunction); }
 function setBlinkSpeed(blinkSpeed, buttonId) {Ohm64_Controller.setBlinkSpeed(blinkSpeed, buttonId);}
 function factoryReset() {Ohm64_Controller.factoryReset();}
-function list() {Ohm64_Controller.setStatesFromArray(arguements);}
+function list(arguements) {Ohm64_Controller.setStatesFromArray(arrayfromargs(messagename,arguments));}
 function button(buttonId, state) {Ohm64_Controller.buttonPress(buttonId, state);}
 function sysex(code) {Ohm64_Controller.parseSysexCode(code);}
 function renderStart() {Ohm64_Controller.renderStart();}
